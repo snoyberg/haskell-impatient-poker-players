@@ -4,6 +4,8 @@ module-template: ! 'module MODULE_NAME where
 extensions: {}
 environment: null
 cabal-file: project.cabal
-modules: {}
+modules:
+  Lesson01:
+    filename: src/Lesson01.hs
 version: 1
 ghc-args: []
