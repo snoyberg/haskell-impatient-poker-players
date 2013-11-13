@@ -90,4 +90,33 @@ Exercises:
    create the list of odd numbers from 1 through 7, I could write: [1, 3, 5, 7].
    Modify the suit line above to use this syntax, and only include the red suits.
 
+Behind the scenes:
+
+For those of you looking to understand things a bit more, here are some details. Reading this
+somewhat violates your claim of being impatient, but should give you a better understanding.
+
+Rank and Suit are examples of something known as "sum types." In contrast, Card is a "product
+type." You can think of the difference between the two as sum types giving you the possibilities
+of each component added together. In other words, a suit can be 1 club, or 1 heart, or 1 diamond,
+or 1 spade. Added together, you get 4 options. Similarly, rank has 13 options.
+
+A product type, on the other hand, is the *combination* of all the different possibilities. A Card
+is one of 4 suits and one of 13 ranks. This results in 4 * 13 = 52 possible values. Therefore, it's
+a product of the different choices.
+
+One term that I never explained above was the usage of the word "do" when defining deck. "do"
+notation is a convenient way of making blocks of code. It also has an interesting characteristic:
+it can perform drastically different things depending on context. In our case, "do" was working
+in the context of lists, or to use the scarier sounding name, the list *monad*. In that context,
+do-notation combines all of the different possible combinations together, which was the exact
+behavior we wanted for deck.
+
+There are many other monads. Another of the most prevalent is the IO monad, used for performing input
+and output. We'll be getting into that quite a bit more in later lessons, but for now, you can see
+how it could be used in our main function to print both the entire deck and the size of the deck:
+
+main = do
+    print deck
+    print (length deck)
+
 -}
