@@ -17,3 +17,5 @@ a feel for Haskell.
 To get started, please click on "Lesson01" in the module list on the left. Each module is a combination of code
 and comments which explain that code. Each module is fully editable. As you're reading through, feel free to
 modify the code as much as you want to explore new ideas.
+
+Thanks to my brother, who gave me the idea for this tutorial.
