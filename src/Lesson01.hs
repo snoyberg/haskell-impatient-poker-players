@@ -81,7 +81,7 @@ Exercises:
 1. Instead of using minBound and maxBound for the suit, use the Club and Spade. The
    result should be the same.
 
-2. There's another game I like to play called Euker, which is played with only the cards
+2. There's another game I like to play called Euchre, which is played with only the cards
    9 and up. Modify the line `rank <- [minBound..maxBound]` so that it only creates
    the ranks 9 through ace.
 
