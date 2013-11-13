@@ -79,6 +79,6 @@ The way pattern matching works is that Haskell tries to match the parameters
 against the patterns, one at a time. If the number of players is 0, then
 the first pattern (or first *clause*) matches, and we print "All hands dealt."
 Otherwise, it moves onto the next clause. Both numberOfPlayers and shuffled are
-variable names, and therefore count 
+variable names, and therefore count as "wildcard patterns," which will match anything.
 
 -}
