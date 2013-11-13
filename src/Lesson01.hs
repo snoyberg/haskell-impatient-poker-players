@@ -10,12 +10,12 @@ data Suit = Club | Diamond | Heart | Spade
 -- one of four ways. Club, Diamond, Heart, and Spade are therefore
 -- known as data constructors. The vertical line between them
 -- (aka, the pipe, typed by pressing shift-backslash) means "or".
--- In other words, a suite is a club, *or* a diamond, *or* a heart,
+-- In other words, a suit is a club, *or* a diamond, *or* a heart,
 -- *or* a spade.
 
 -- We want to be able to show our suit and check if it equals another
 -- value. We use a deriving clause to achieve that, which for the moment
--- we can treat as magic (we'll define "magic" better in a latter tutorial).
+-- we can treat as magic (we'll define "magic" better in a later tutorial).
     deriving (Show, Eq, Ord, Enum, Bounded)
 
 -- I derived five different typeclasses here. Let me give a quick explanation

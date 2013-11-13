@@ -11,7 +11,7 @@ in Haskell, but if you want to properly learn the language, I'd recommend
 [reading a real tutorial](https://www.fpcomplete.com/school/starting-with-haskell/introduction-to-haskell/1-haskell-basics).
 
 You should be able to follow this tutorial without any experience with programming in general, or Haskell in particular.
-However, since I won't be focusing on details, it should be equally usable by an experienced programming trying to get
+However, since I won't be focusing on details, it should be equally usable by an experienced programmer trying to get
 a feel for Haskell.
 
 To get started, please click on "Lesson01" in the module list on the left.
