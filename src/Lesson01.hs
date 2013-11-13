@@ -52,8 +52,8 @@ data Card = Card Suit Rank
 -- OK, we've got three data types, let's do something useful with them. I'd like
 -- to create a deck of cards. That turns out to be really easy:
 deck = do
-    suit <- [minBound..maxBound]
-    rank <- [minBound..maxBound]
+    suit <- [minBound .. maxBound]
+    rank <- [minBound .. maxBound]
     return (Card suit rank)
 
 -- That may have looked like a bit of magic, so let's explain it. [minBound..maxBound]
@@ -79,10 +79,11 @@ main = print deck
 Exercises:
 
 1. Instead of using minBound and maxBound for the suit, use the Club and Spade. The
-   result should be the same.
+   result should be the same. Make sure to keep a space between the dots and the words
+   Club and Spade.
 
 2. There's another game I like to play called Euchre, which is played with only the cards
-   9 and up. Modify the line `rank <- [minBound..maxBound]` so that it only creates
+   9 and up. Modify the line `rank <- [minBound .. maxBound]` so that it only creates
    the ranks 9 through ace.
 
 3. There's a different syntax for lists which does not use the two dots. For example, to

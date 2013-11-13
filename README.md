@@ -14,4 +14,6 @@ You should be able to follow this tutorial without any experience with programmi
 However, since I won't be focusing on details, it should be equally usable by an experienced programmer trying to get
 a feel for Haskell.
 
-To get started, please click on "Lesson01" in the module list on the left.
+To get started, please click on "Lesson01" in the module list on the left. Each module is a combination of code
+and comments which explain that code. Each module is fully editable. As you're reading through, feel free to
+modify the code as much as you want to explore new ideas.
