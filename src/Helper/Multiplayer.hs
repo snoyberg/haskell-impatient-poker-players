@@ -7,8 +7,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 module Helper.Multiplayer
-    ( main
-    , tellAllPlayers
+    ( tellAllPlayers
     , tellPlayer
     , askPlayer
     , getPlayers
@@ -232,13 +231,14 @@ postGameR gn = withPlayerName $ \pn -> do
     minput <- lookupPostParam "input"
     input <- maybe (invalidArgs ["Missing input"]) return minput
     join $ liftIO $ atomically $ do
-        gss <- readTVarIO games
-        case lookup gn gs of
+        gss <- readTVar games
+        case lookup gn gss of
             Nothing -> return notFound
-            Just GSNeedPlayers {} -> return badMethod
-            Just (GSRunning gd (NMDone _)) -> return badMethod
             Just (GSRunning gd (NMAskPlayer p _ f)) | p == pn -> do
-                error "FIXME"
+                let (gd', nm) = unGame (f $ unpack input) gd
+                writeTVar games $ insert gn (GSRunning gd' nm) gss
+                return $ redirect $ GameR gn
+            Just _ -> return badMethod
 
 playGame :: String
          -> Int -- ^ player count
@@ -251,13 +251,3 @@ playGame t players g = do
                <*> pure g
                <*> pure players
     warpEnv app
-
-dummyGame :: Game ()
-dummyGame = do
-    [p] <- getPlayers
-    tellAllPlayers "Welcome to the game."
-    something <- askPlayer p "Say something."
-    tellAllPlayers $ show p ++ " said " ++ something
-
-main :: IO ()
-main = playGame "Test game" 1 dummyGame
