@@ -11,6 +11,8 @@ modules:
     filename: src/Lesson03.hs
   Helper:
     filename: src/Helper.hs
+  Helper.Multiplayer:
+    filename: src/Helper/Multiplayer.hs
   Lesson01:
     filename: src/Lesson01.hs
 version: 1

@@ -3,3 +3,6 @@ Better Show instance for Card
 Multiple decks
 Return list of hands
 State monad
+Calculate winning hands
+Betting
+Web based interface
