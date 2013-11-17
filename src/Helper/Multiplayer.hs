@@ -9,15 +9,18 @@
 module Helper.Multiplayer where
 
 import           ClassyPrelude.Yesod
-import           Text.Blaze.Html     (ToMarkup)
-import Prelude (Show (..))
+import           Control.Concurrent.STM
+import           Control.Monad          (replicateM)
+import           Prelude                (Show (..))
+import           System.Random
+import           Text.Blaze.Html        (ToMarkup)
 
 data Game a = Game
 
 data App = App
-    { games   :: !(IORef (HashMap GameName GameState))
+    { games   :: !(TVar (HashMap GameName GameState))
     , title   :: !Text
-    , players :: !(IORef (HashSet PlayerName))
+    , players :: !(TVar (HashSet PlayerName))
     , game    :: !([Player] -> Game ())
     , pcount  :: !Int
     }
@@ -33,8 +36,9 @@ data Player = Player
     }
 instance Show Player where
     show = unpack . unPlayerName . playerName
-data GameState = GameState
-    {}
+
+data GameState = GSNeedPlayers !(Vector Player)
+               | GSRunning !(Vector Player)
 
 mkYesod "App" [parseRoutes|
 / HomeR GET
@@ -98,12 +102,30 @@ getSetPlayerNameR = do
 postSetPlayerNameR = getSetPlayerNameR
 
 getJoinGameR :: Handler ()
-getJoinGameR = withPlayerName $ \pn -> error "getJoinGameR"
+getJoinGameR = withPlayerName $ \pn -> do
+    App {..} <- getYesod
+    newName <- fmap (GameName . pack)
+             $ liftIO
+             $ Control.Monad.replicateM 10
+             $ randomRIO ('A', 'Z')
+    let loop [] = (newName, addPlayer mempty)
+        loop ((name, GSNeedPlayers players):_) = (name, addPlayer players)
+        loop (_:rest) = loop rest
+        addPlayer v
+            | length v' >= pcount = GSRunning v'
+            | otherwise = GSNeedPlayers v'
+          where
+            v' = v ++ singleton (Player pn)
+    join $ liftIO $ atomically $ do
+        gs <- readTVar games
+        let (gameName, newGameState) = loop $ unpack gs
+        writeTVar games $ insert gameName newGameState gs
+        return $ redirect $ GameR gameName
 
 getGameR :: GameName -> Handler ()
 getGameR gn = withPlayerName $ \pn -> do
     App {..} <- getYesod
-    gss <- readIORef games
+    gss <- liftIO $ readTVarIO games
     gs <- maybe notFound return $ lookup gn gss
     error "getGameR"
 
@@ -112,9 +134,9 @@ playGame :: String
          -> ([Player] -> Game ())
          -> IO ()
 playGame t players g = do
-    app <- App <$> newIORef mempty
+    app <- App <$> newTVarIO mempty
                <*> pure (pack t)
-               <*> newIORef mempty
+               <*> newTVarIO mempty
                <*> pure g
                <*> pure players
     warpEnv app
