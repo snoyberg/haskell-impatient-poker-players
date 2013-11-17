@@ -6,59 +6,122 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
-module Helper.Multiplayer where
+module Helper.Multiplayer
+    ( main
+    , tellAllPlayers
+    , tellPlayer
+    , askPlayer
+    , getPlayers
+    , playGame
+    ) where
 
-import           ClassyPrelude.Yesod
+import           ClassyPrelude.Yesod hiding (split, show)
 import           Control.Concurrent.STM
 import           Control.Monad          (replicateM)
 import           Prelude                (Show (..))
 import           System.Random
 import           Text.Blaze.Html        (ToMarkup)
+import Control.Monad.Random.Class
 
-data Game a = Game
+data GameData = GameData
+    { gdPlayers :: !(Vector Player)
+    , gdMessages :: !(HashMap Player (Vector Message))
+    , gdNextMessageId :: !Word32
+    , gdRandomGen :: !StdGen
+    }
+newtype Game a = Game
+    { unGame :: GameData -> (GameData, NextMove a)
+    }
+data NextMove a = NMAskPlayer Player String (String -> Game a)
+                | NMDone a
+instance Functor Game where
+    fmap = liftM
+instance Applicative Game where
+    pure = return
+    (<*>) = ap
+instance Monad Game where
+    return a = Game $ \gd -> (gd, NMDone a)
+
+    Game f >>= g = Game $ \gd1 -> do
+        let (gd2, nm) = f gd1
+         in case nm of
+              NMDone a -> unGame (g a) gd2
+              NMAskPlayer p s f' -> (gd2, NMAskPlayer p s $ f' >=> g)
+instance MonadRandom Game where
+    getRandom = liftStateG random
+    getRandoms = liftStateG $ first randoms . split
+    getRandomR (x,y) = liftStateG $ randomR (x,y)
+    getRandomRs (x,y) = liftStateG $
+                            first (randomRs (x,y)) . split
+liftStateG :: (StdGen -> (a, StdGen)) -> Game a
+liftStateG f = Game $ \gd ->
+    let (a, gen') = f $ gdRandomGen gd
+     in (gd { gdRandomGen = gen' }, NMDone a)
+
+tellAllPlayers :: String -> Game ()
+tellAllPlayers msg = do
+    gd <- Game $ \gd -> (gd, NMDone gd)
+    forM_ (gdPlayers gd) $ flip tellPlayer msg
+
+tellPlayer :: Player -> String -> Game ()
+tellPlayer player content = Game $ \gd -> do
+    let msgs = fromMaybe mempty $ lookup player $ gdMessages gd
+        msg = Message (pack content) (gdNextMessageId gd)
+        gd' = gd { gdMessages = insert player (msgs ++ singleton msg) $ gdMessages gd
+                 , gdNextMessageId = succ $ gdNextMessageId gd
+                 }
+     in (gd', NMDone ())
+
+askPlayer :: Player -> String -> Game String
+askPlayer p s = Game $ \gd -> (gd, NMAskPlayer p s return)
+
+getPlayers :: Game [Player]
+getPlayers = Game $ \gd -> (gd, NMDone $ unpack $ gdPlayers gd)
 
 data App = App
     { games   :: !(TVar (HashMap GameName GameState))
     , title   :: !Text
-    , players :: !(TVar (HashSet PlayerName))
-    , game    :: !([Player] -> Game ())
+    , players :: !(TVar (HashSet Player))
+    , game    :: !(Game ())
     , pcount  :: !Int
     }
 
 newtype GameName = GameName { unGameName :: Text }
     deriving (PathPiece, Show, Read, Eq, Hashable)
 
-newtype PlayerName = PlayerName { unPlayerName :: Text }
-    deriving (PathPiece, Show, Read, Eq, ToMarkup, Hashable)
+newtype Player = Player { playerName :: Text }
+    deriving (PathPiece, Eq, ToMarkup, Hashable, Ord)
 
-data Player = Player
-    { playerName :: !PlayerName
+data Message = Message
+    { messageText :: !Text
+    , messageId :: !Word32
     }
+
 instance Show Player where
-    show = unpack . unPlayerName . playerName
+    show = unpack . playerName
 
 data GameState = GSNeedPlayers !(Vector Player)
-               | GSRunning !(Vector Player)
+               | GSRunning !GameData !(NextMove ())
 
 mkYesod "App" [parseRoutes|
 / HomeR GET
 /set-player-name SetPlayerNameR GET POST
 /join-game JoinGameR GET
-/game/#GameName GameR GET
+/game/#GameName GameR GET POST
 |]
 
 instance Yesod App
 instance RenderMessage App FormMessage where
     renderMessage _ _ = defaultFormMessage
 
-withPlayerName :: (PlayerName -> Handler a) -> Handler a
+withPlayerName :: (Player -> Handler a) -> Handler a
 withPlayerName f = do
     mpn <- lookupSession "player-name"
     case mpn of
         Nothing -> do
             setUltDestCurrent
             redirect SetPlayerNameR
-        Just pn -> f $ PlayerName pn
+        Just pn -> f $ Player pn
 
 getHomeR :: Handler Html
 getHomeR = withPlayerName $ \pn -> do
@@ -108,30 +171,78 @@ getJoinGameR = withPlayerName $ \pn -> do
              $ liftIO
              $ Control.Monad.replicateM 10
              $ randomRIO ('A', 'Z')
+    randomGen <- liftIO getStdGen
     let loop [] = (newName, addPlayer mempty)
         loop ((name, GSNeedPlayers players):_) = (name, addPlayer players)
         loop (_:rest) = loop rest
         addPlayer v
-            | length v' >= pcount = GSRunning v'
+            | length v' >= pcount =
+                let (gd, nm) = unGame game GameData
+                                { gdPlayers = v'
+                                , gdMessages = mempty
+                                , gdNextMessageId = minBound
+                                , gdRandomGen = randomGen
+                                }
+                 in GSRunning gd nm
             | otherwise = GSNeedPlayers v'
           where
-            v' = v ++ singleton (Player pn)
+            v' = v ++ singleton pn
     join $ liftIO $ atomically $ do
         gs <- readTVar games
         let (gameName, newGameState) = loop $ unpack gs
         writeTVar games $ insert gameName newGameState gs
         return $ redirect $ GameR gameName
 
-getGameR :: GameName -> Handler ()
+getGameR :: GameName -> Handler Html
 getGameR gn = withPlayerName $ \pn -> do
     App {..} <- getYesod
     gss <- liftIO $ readTVarIO games
     gs <- maybe notFound return $ lookup gn gss
-    error "getGameR"
+    case gs of
+        GSNeedPlayers players -> defaultLayout $ do
+            setTitle "Waiting for players"
+            [whamlet|
+                <p>Waiting for players to join. We need #{show pcount} total, currently waiting:
+                <ul>
+                    $forall p <- players
+                        <li>#{p}
+            |]
+        GSRunning gd nm -> defaultLayout $ do
+            setTitle $ toHtml $ "Playing a game of " ++ title
+            [whamlet|
+                <ul>
+                    $forall Message msg _ <- fromMaybe mempty $ lookup pn $ gdMessages gd
+                        <li>#{msg}
+            |]
+            case nm of
+                NMDone () -> [whamlet|<p>Game over.|]
+                NMAskPlayer p msg _
+                    | p == pn ->
+                        [whamlet|
+                            <form method=post>
+                                <p>#{msg}
+                                <input type=text name=input>
+                                <input type=submit>
+                        |]
+                    | otherwise -> [whamlet|<p>Waiting for response from #{p}.|]
+
+postGameR :: GameName -> Handler ()
+postGameR gn = withPlayerName $ \pn -> do
+    App {..} <- getYesod
+    minput <- lookupPostParam "input"
+    input <- maybe (invalidArgs ["Missing input"]) return minput
+    join $ liftIO $ atomically $ do
+        gss <- readTVarIO games
+        case lookup gn gs of
+            Nothing -> return notFound
+            Just GSNeedPlayers {} -> return badMethod
+            Just (GSRunning gd (NMDone _)) -> return badMethod
+            Just (GSRunning gd (NMAskPlayer p _ f)) | p == pn -> do
+                error "FIXME"
 
 playGame :: String
          -> Int -- ^ player count
-         -> ([Player] -> Game ())
+         -> Game ()
          -> IO ()
 playGame t players g = do
     app <- App <$> newTVarIO mempty
@@ -141,5 +252,12 @@ playGame t players g = do
                <*> pure players
     warpEnv app
 
+dummyGame :: Game ()
+dummyGame = do
+    [p] <- getPlayers
+    tellAllPlayers "Welcome to the game."
+    something <- askPlayer p "Say something."
+    tellAllPlayers $ show p ++ " said " ++ something
+
 main :: IO ()
-main = playGame "Test game" 2 (const Game)
+main = playGame "Test game" 1 dummyGame
