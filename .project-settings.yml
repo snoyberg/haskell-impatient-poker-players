@@ -13,10 +13,18 @@ modules:
     filename: src/Lesson05.hs
   Lesson03:
     filename: src/Lesson03.hs
+  Helper.WinningTests:
+    filename: src/Helper/WinningTests.hs
   Helper:
     filename: src/Helper.hs
+  Lesson06:
+    filename: src/Lesson06.hs
   Helper.Multiplayer:
     filename: src/Helper/Multiplayer.hs
+  Helper.Winning:
+    filename: src/Helper/Winning.hs
+  Helper.Pretty:
+    filename: src/Helper/Pretty.hs
   Lesson01:
     filename: src/Lesson01.hs
 version: 1
