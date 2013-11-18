@@ -5,6 +5,8 @@ extensions: {}
 environment: null
 cabal-file: project.cabal
 modules:
+  Lesson04:
+    filename: src/Lesson04.hs
   Lesson02:
     filename: src/Lesson02.hs
   Lesson03:

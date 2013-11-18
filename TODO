@@ -6,3 +6,5 @@ State monad
 Calculate winning hands
 Betting
 Web based interface
+
+Yesod multiplayer: use bootstrap, auto-refresh
