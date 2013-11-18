@@ -9,6 +9,8 @@ modules:
     filename: src/Lesson04.hs
   Lesson02:
     filename: src/Lesson02.hs
+  Lesson05:
+    filename: src/Lesson05.hs
   Lesson03:
     filename: src/Lesson03.hs
   Helper:

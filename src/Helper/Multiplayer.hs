@@ -11,7 +11,7 @@ module Helper.Multiplayer
     , tellPlayer
     , askPlayer
     , getPlayers
-    , playGame
+    , playMultiplayerGame
     ) where
 
 import           ClassyPrelude.Yesod hiding (split, show)
@@ -240,11 +240,11 @@ postGameR gn = withPlayerName $ \pn -> do
                 return $ redirect $ GameR gn
             Just _ -> return badMethod
 
-playGame :: String
-         -> Int -- ^ player count
-         -> Game ()
-         -> IO ()
-playGame t players g = do
+playMultiplayerGame :: String
+                    -> Int -- ^ player count
+                    -> Game ()
+                    -> IO ()
+playMultiplayerGame t players g = do
     app <- App <$> newTVarIO mempty
                <*> pure (pack t)
                <*> newTVarIO mempty
