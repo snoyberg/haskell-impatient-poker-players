@@ -25,13 +25,13 @@ import System.Random.Shuffle
 -- suits, since suits are irrelevant for winners.
 data PokerHand
     = HighCard [Rank]
-    | Pair Rank [Rank] -- the rank of the pair, plus the rank of the next three cards (the kickers)
+    | Pair Rank Rank Rank Rank -- the rank of the pair, plus the rank of the next three cards (the kickers)
     | TwoPair Rank Rank Rank -- the rank of the high pair, the rank of the low pair, and the last card
-    | ThreeOfAKind Rank [Rank]
+    | ThreeOfAKind Rank Rank Rank -- the rank of the three matching cards, plus the two kickers
     | Straight Rank -- high card
     | Flush [Rank] -- need the ranks of all the cards in case there are two flushes
     | FullHouse Rank Rank -- first the triple, then the pair
-    | FourOfAKind Rank Rank
+    | FourOfAKind Rank Rank -- the four of the kind and the kicker
     | StraightFlush Rank
     deriving (Show, Eq, Ord)
 
@@ -104,72 +104,64 @@ straight cards = do
         then return (StraightFlush highest)
         else return (Straight highest)
 
--- The most complicated analysis is matching cards, since there are so many
+-- Finally, we want to search for matching cards. There are a number of
 -- different possibilities: pair, two pair, three of a kind, four of a kind,
--- and full house. Before we get started, we need a helper function: takeEach.
--- This function itself is pretty complicated, so make sure to read the description
--- and the code carefully. Once you get this, the rest of the code is pretty easy.
+-- and full house. Fortunately, we can make this analysis pretty easy using
+-- pattern matching. Let me describe the approach at a high level:
 --
--- Suppose we have five cards. What we're going to want to do is analyze each
--- of the five cards against the other four cards, one at a time. This function
--- allows this, by creating a list of those five different combinations. We can
--- think of this like keeping two stacks of cards: the front and the back.
--- We take one card off the back, create a result of all the other front and back
--- cards, and then put that card on the front stack and continue. Let's see how this
--- works.
-takeEach xs =
-    -- We start off with all cards on the back stack and an empty front stack.
-    go [] xs
+-- 1. Sort the five cards into descending ranks using cardRanks.
+--
+-- 2. We want to group all matching ranks into sublists. Haskell provides a function
+--    to do just that: the group function. Supposing we had a hand with the cards
+--    8C, 8D, KS, AC, 9D, the result of this step would be:
+--
+--        [[Ace], [King], [Nine], [Eight, Eight]]
+--
+-- 3. Sort the sublists in descending length order, so that the largest collection
+--    of matches appear first. If we apply that to the example above, we get:
+--
+--        [[Eight, Eight], [Ace], [King], [Nine]]
+--
+-- 4. Then it's simply a matter of matching all of the different possible patterns
+--    to determine the type of hand the player has.
+--
+-- Let's start by implementing the helper function we'll need for step (3).
+descendingLengths =
+    -- sortBy uses some comparison function to determine the order for two
+    -- elements in the list.
+    sortBy compareLengths
   where
-    -- When the back stack is empty, we're all done.
-    go front [] = []
-    -- Take one card off the back, create a pair of that card with all the front
-    -- and back stack cards, and then put the card on the front stack and keep going.
-    go front (x:back) = (x, front ++ back) : go (x:front) back
+    -- We want to compare two lists so that the longer list comes first.
+    -- To do that, we compare the lengths *in reverse*, since compare would
+    -- normally make the smaller number appear earlier.
+    compareLengths x y = compare (length y) (length x)
 
--- This is a simple helper function we'll be using below.
-isRank rank1 (Card _ rank2) = rank1 == rank2
+matches cards =
+    -- We want to pattern match after apply step 1 (cardRanks), step 2 (group),
+    -- and step 3 (descendingLengths).
+    case descendingLengths (group (cardRanks cards)) of
+        -- If the result is five one-element lists, it means that
+        -- there are no matching cards at all. In that case, we
+        -- have no results from this function.
+        [[_], [_], [_], [_], [_]] -> []
 
-matches cards = do
-    -- We'll go through each of the five cards, one at a time.
-    (Card _ rank, rest) <- takeEach cards
-    -- Once we know the rank of the first card, we find all of
-    -- the other cards that match it. To do this, we use the
-    -- partition function, which splits a list into cards that
-    -- match and cards that don't match.
-    case partition (isRank rank) rest of
-        -- The first list is empty, meaning there were no matching cards.
-        ([], _) -> []
-        -- There's exactly one matching card, so we know we have a pair.
-        -- That leaves three options: one pair, two pair, or a full house.
-        -- We need to determine which case we're dealing with.
-        ([_], rest2) -> do
-            -- We need to look at each of the three remaining cards, one
-            -- at a time, the same as we did before.
-            (Card _ rank2, rest3) <- takeEach rest2
-            -- Again, let's find all matches.
-            case partition (isRank rank2) rest3 of
-                -- No cards match, so we have one pair.
-                ([], _) -> return (Pair rank (cardRanks rest2))
-                -- There was exactly one match, so we have two pair.
-                ([_], [Card _ kicker]) ->
-                    -- We need to make sure that the higher rank appears
-                    -- first, to make sure that comparison give higher weight
-                    -- to the higher pair.
-                    if rank > rank2
-                        then return (TwoPair rank rank2 kicker)
-                        else return (TwoPair rank2 rank kicker)
-                -- There were two matches, so we have a full house.
-                ([_, _], []) -> return (FullHouse rank2 rank)
-        -- There are two matches, so we have at least a three of a kind. Now
-        -- we need to test if we also have a full house.
-        ([_, _], rest) -> do
-            let [Card _ kicker1, Card _ kicker2] = rest
-            if kicker1 == kicker2
-                then return (FullHouse rank kicker1)
-                else return (ThreeOfAKind rank (cardRanks rest))
-        -- Three matches means we have a four of a kind.
-        ([_, _, _], [Card _ kicker]) -> return (FourOfAKind rank kicker)
+        -- We have one pair and three non-matches.
+        [[pair, _], [kicker1], [kicker2], [kicker3]] -> return (Pair pair kicker1 kicker2 kicker3)
+
+        -- Two pairs with one non-match.
+        [[pair1, _], [pair2, _], [kicker]] -> return (TwoPair pair1 pair2 kicker)
+
+        -- A three of a kind and two non-matches.
+        [[three, _, _], [kicker1], [kicker2]] -> return (ThreeOfAKind three kicker1 kicker2)
+
+        -- A three of a kind and a pair, also known as a full house.
+        [[three, _, _], [pair, _]] -> return (FullHouse three pair)
+
+        -- A four of a kind and one non-match.
+        [[four, _, _, _], [kicker]] -> return (FourOfAKind four kicker)
+
+        -- Spend some time thinking if you can come up with any
+        -- combination which isn't matched by the patterns above.
 
 -- Now that we have all of our helper functions, we want to use them to
 -- get a list of all the possible hands. Since each of our functions returns

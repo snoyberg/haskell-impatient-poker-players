@@ -17,8 +17,9 @@ main = hspec $ do
     go "AD 2C 3C 4C 5C" (Straight Five)
     go "6C 2C 3C 4C 5C" (StraightFlush Six)
     go "7C 2C 3C 4C 5C" (Flush [Seven, Five, Four, Three, Two])
-    go "AC AD 3C 8D KS" (Pair Ace [King, Eight, Three])
+    go "AC AD 3C 8D KS" (Pair Ace King Eight Three)
     go "AC AD 3C 3D 8D" (TwoPair Ace Three Eight)
+    go "AC KC KD KS AD" (FullHouse King Ace)
 
 cardMap = Map.fromList $ map (prettyCard &&& id) deck
 
