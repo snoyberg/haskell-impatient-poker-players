@@ -182,6 +182,7 @@ getJoinGameR = withPlayerName $ \pn -> do
         loop ((name, GSNeedPlayers players):_) = (name, addPlayer players)
         loop (_:rest) = loop rest
         addPlayer v
+            | pn `elem` v = GSNeedPlayers v
             | length v' >= pcount =
                 let (gd, nm) = unGame game GameData
                                 { gdPlayers = v'
@@ -205,7 +206,7 @@ getGameR gn = withPlayerName $ \pn -> do
     gss <- liftIO $ readTVarIO games
     gs <- maybe (redirect JoinGameR) return $ lookup gn gss
     case gs of
-        GSNeedPlayers players -> defaultLayout $ do
+        GSNeedPlayers players | pn `elem` players -> defaultLayout $ do
             setTitle "Waiting for players"
             [whamlet|
                 <p>Waiting for players to join. We need #{show pcount} total, currently waiting:
@@ -213,6 +214,7 @@ getGameR gn = withPlayerName $ \pn -> do
                     $forall p <- players
                         <li>#{p}
             |]
+        GSNeedPlayers _ -> redirect JoinGameR
         GSRunning gd nm -> defaultLayout $ do
             setTitle $ toHtml $ "Playing a game of " ++ title
             [whamlet|
