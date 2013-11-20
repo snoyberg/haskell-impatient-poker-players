@@ -12,6 +12,8 @@ module Helper.Multiplayer
     , askPlayer
     , getPlayers
     , playMultiplayerGame
+    , clearMessages
+    , Player
     ) where
 
 import           ClassyPrelude.Yesod hiding (split, show)
@@ -70,6 +72,9 @@ tellPlayer player content = Game $ \gd -> do
                  , gdNextMessageId = succ $ gdNextMessageId gd
                  }
      in (gd', NMDone ())
+
+clearMessages :: Game ()
+clearMessages = Game $ \gd -> (gd { gdMessages = mempty }, NMDone ())
 
 askPlayer :: Player -> String -> Game String
 askPlayer p s = Game $ \gd -> (gd, NMAskPlayer p s return)
@@ -137,7 +142,9 @@ getHomeR = withPlayerName $ \pn -> do
 
 getSetPlayerNameR, postSetPlayerNameR :: Handler Html
 getSetPlayerNameR = do
-    ((res, form), enctype) <- runFormPost $ renderDivs $ areq playerNameField "Enter your codename" Nothing
+    ((res, form), enctype) <- runFormPost $ renderDivs $ areq playerNameField "Enter your codename"
+        { fsAttrs = [("autofocus", "autofocus")]
+        } Nothing
     case res of
         FormSuccess name -> do
             setSession "player-name" name
@@ -196,7 +203,7 @@ getGameR :: GameName -> Handler Html
 getGameR gn = withPlayerName $ \pn -> do
     App {..} <- getYesod
     gss <- liftIO $ readTVarIO games
-    gs <- maybe notFound return $ lookup gn gss
+    gs <- maybe (redirect JoinGameR) return $ lookup gn gss
     case gs of
         GSNeedPlayers players -> defaultLayout $ do
             setTitle "Waiting for players"
@@ -220,7 +227,7 @@ getGameR gn = withPlayerName $ \pn -> do
                         [whamlet|
                             <form method=post>
                                 <p>#{msg}
-                                <input type=text name=input>
+                                <input type=text name=input autofocus>
                                 <input type=submit>
                         |]
                     | otherwise -> [whamlet|<p>Waiting for response from #{p}.|]
@@ -233,12 +240,12 @@ postGameR gn = withPlayerName $ \pn -> do
     join $ liftIO $ atomically $ do
         gss <- readTVar games
         case lookup gn gss of
-            Nothing -> return notFound
+            Nothing -> return $ redirect $ GameR gn
             Just (GSRunning gd (NMAskPlayer p _ f)) | p == pn -> do
                 let (gd', nm) = unGame (f $ unpack input) gd
                 writeTVar games $ insert gn (GSRunning gd' nm) gss
                 return $ redirect $ GameR gn
-            Just _ -> return badMethod
+            Just _ -> return $ redirect $ GameR gn
 
 playMultiplayerGame :: String
                     -> Int -- ^ player count
