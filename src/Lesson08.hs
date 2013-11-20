@@ -58,6 +58,7 @@ wager p1 p2 pot owed = do
     action <- askAction p1 allowedRaise
     case action of
         Call -> do
+            tellAllPlayers $ show (player p1) ++ " calls"
             let p1' = p1 { chips = chips p1 - owed }
                 pot' = pot + owed
             finishHand p1' p2 pot'
@@ -65,6 +66,7 @@ wager p1 p2 pot owed = do
             tellAllPlayers $ show (player p1) ++ " folds"
             startGame (player p1) (chips p1) (player p2) (chips p2 + pot)
         Raise raise -> do
+            tellAllPlayers $ show (player p1) ++ " raises " ++ show raise
             let p1' = p1 { chips = chips p1 - owed - raise }
             wager p2 p1' (pot + owed + raise) raise
 
